@@ -7,15 +7,14 @@
     <title>Carrera Leaderboard</title>
     <style>
       body {
-        font-family: "Courier New", Courier, monospace;
+        font-family: 'Courier New', Courier, monospace;
         background-color: white;
         color: red;
         padding: 20px;
         line-height: 1.2;
         font-size: 16px;
       }
-      h1,
-      h2 {
+      h1, h2 {
         margin: 0;
         padding: 0;
         font-size: 16px;
@@ -34,7 +33,7 @@
         width: 20px;
       }
       input {
-        font-family: "Courier New", Courier, monospace;
+        font-family: 'Courier New', Courier, monospace;
         background-color: white;
         color: red;
         border: 1px solid red;
@@ -43,7 +42,7 @@
         width: 100px;
       }
       button {
-        font-family: "Courier New", Courier, monospace;
+        font-family: 'Courier New', Courier, monospace;
         background-color: white;
         color: red;
         border: 1px solid red;
@@ -95,14 +94,55 @@
       <button onclick="cancelDelete()">NO</button>
     </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
     <script>
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyCe5Xpf_xUPpXTQ3V8dqokqHt89kkNiwX4",
+        authDomain: "carrera-leaderboards.firebaseapp.com",
+        projectId: "carrera-leaderboards",
+        storageBucket: "carrera-leaderboards.appspot.com",
+        messagingSenderId: "1036912209370",
+        appId: "1:1036912209370:web:cfd23ba8b95236e20ee4e3"
+      };
+
+      // Initialize Firebase
+      firebase.initializeApp(firebaseConfig);
+      const database = firebase.database();
+      const lapTimesRef = database.ref('lapTimes');
+
       let itemToDelete = null;
 
+      function loadLapTimes() {
+        lapTimesRef.on('value', (snapshot) => {
+          const lapTimes = snapshot.val() || {};
+          renderLapTimes(Object.values(lapTimes));
+        });
+      }
+
+      function renderLapTimes(lapTimes) {
+        const list = document.getElementById('fastestLapList');
+        list.innerHTML = '';
+        lapTimes.sort((a, b) => convertToSeconds(a.time) - convertToSeconds(b.time));
+        lapTimes.forEach((item, index) => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <span class="position">${index + 1} </span>
+            <span class="time">${item.time}</span> ${item.racer} ${item.car}
+            <button onclick="showDeleteConfirmation('${item.id}')">X</button>
+          `;
+          list.appendChild(li);
+        });
+      }
+
       function addLapTime() {
-        const timeInput = document.getElementById("lapTimeInput");
-        const nameInput = document.getElementById("racerNameInput");
-        const carInput = document.getElementById("carNameInput");
-        const errorMessage = document.getElementById("errorMessage");
+        const timeInput = document.getElementById('lapTimeInput');
+        const nameInput = document.getElementById('racerNameInput');
+        const carInput = document.getElementById('carNameInput');
+        const errorMessage = document.getElementById('errorMessage');
         const lapTime = timeInput.value.trim();
         const racerName = nameInput.value.trim().toUpperCase();
         const carName = carInput.value.trim().toUpperCase();
@@ -110,42 +150,34 @@
         const timeFormat = /^([0-5]?[0-9]):([0-9][0-9])$/;
 
         if (timeFormat.test(lapTime) && racerName && carName) {
-          errorMessage.textContent = "";
-          addItemToList(lapTime, racerName, carName);
-          timeInput.value = "";
-          nameInput.value = "";
-          carInput.value = "";
-          sortList();
+          errorMessage.textContent = '';
+          const newLapTimeRef = lapTimesRef.push();
+          newLapTimeRef.set({
+            id: newLapTimeRef.key,
+            time: lapTime,
+            racer: racerName,
+            car: carName
+          });
+          timeInput.value = '';
+          nameInput.value = '';
+          carInput.value = '';
         } else {
-          errorMessage.textContent =
-            "INVALID INPUT. USE FORMAT: MM:SS, NAME, CAR";
+          errorMessage.textContent = 'INVALID INPUT. USE FORMAT: MM:SS, NAME, CAR';
         }
       }
 
-      function addItemToList(lapTime, racerName, carName) {
-        const list = document.getElementById("fastestLapList");
-        const newItem = document.createElement("li");
-        newItem.innerHTML = `
-          <span class="position"></span>
-          <span class="time">${lapTime}</span> ${racerName} ${carName}
-          <button onclick="showDeleteConfirmation(this)">X</button>
-        `;
-        list.appendChild(newItem);
-      }
-
-      function showDeleteConfirmation(button) {
-        itemToDelete = button.parentNode;
-        document.getElementById("overlay").style.display = "block";
-        document.getElementById("confirmDialog").style.display = "block";
+      function showDeleteConfirmation(id) {
+        itemToDelete = id;
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('confirmDialog').style.display = 'block';
       }
 
       function confirmDelete() {
         if (itemToDelete) {
-          itemToDelete.parentNode.removeChild(itemToDelete);
+          lapTimesRef.child(itemToDelete).remove();
           itemToDelete = null;
         }
         hideDeleteConfirmation();
-        updatePositions();
       }
 
       function cancelDelete() {
@@ -154,45 +186,35 @@
       }
 
       function hideDeleteConfirmation() {
-        document.getElementById("overlay").style.display = "none";
-        document.getElementById("confirmDialog").style.display = "none";
-      }
-
-      function sortList() {
-        const list = document.getElementById("fastestLapList");
-        const items = Array.from(list.getElementsByTagName("li"));
-
-        items.sort((a, b) => {
-          const timeA = a.querySelector(".time").textContent;
-          const timeB = b.querySelector(".time").textContent;
-          return convertToSeconds(timeA) - convertToSeconds(timeB);
-        });
-
-        while (list.firstChild) {
-          list.removeChild(list.firstChild);
-        }
-
-        items.forEach((item) => list.appendChild(item));
-        updatePositions();
-      }
-
-      function updatePositions() {
-        const items = document.querySelectorAll("#fastestLapList li");
-        items.forEach((item, index) => {
-          item.querySelector(".position").textContent = index + 1 + " ";
-        });
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('confirmDialog').style.display = 'none';
       }
 
       function convertToSeconds(timeString) {
-        const [minutes, seconds] = timeString.split(":").map(Number);
+        const [minutes, seconds] = timeString.split(':').map(Number);
         return minutes * 60 + seconds;
       }
 
-      // Add initial items
-      addItemToList("29:88", "DIMI", "GREEN CAR");
-      addItemToList("30:08", "DIMI", "GREEN CAR");
-      addItemToList("31:10", "DIMI", "WHITE PORSCHE");
-      sortList();
+      // Load lap times when the page loads
+      loadLapTimes();
+
+      // Add initial items if the list is empty
+      lapTimesRef.once('value', (snapshot) => {
+        if (!snapshot.exists()) {
+          const initialLapTimes = [
+            { time: '29:88', racer: 'DIMI', car: 'GREEN CAR' },
+            { time: '30:08', racer: 'DIMI', car: 'GREEN CAR' },
+            { time: '31:10', racer: 'DIMI', car: 'WHITE PORSCHE' }
+          ];
+          initialLapTimes.forEach((lapTime) => {
+            const newLapTimeRef = lapTimesRef.push();
+            newLapTimeRef.set({
+              id: newLapTimeRef.key,
+              ...lapTime
+            });
+          });
+        }
+      });
     </script>
   </body>
 </html>
