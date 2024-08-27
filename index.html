@@ -6,7 +6,71 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Carrera Leaderboard</title>
     <style>
-      /* Your existing CSS here */
+      body {
+        font-family: 'Courier New', Courier, monospace;
+        background-color: white;
+        color: red;
+        padding: 20px;
+        line-height: 1.2;
+        font-size: 16px;
+      }
+      h1, h2 {
+        margin: 0;
+        padding: 0;
+        font-size: 16px;
+        font-weight: normal;
+      }
+      #fastestLapList {
+        list-style-type: none;
+        padding: 0;
+        margin: 20px 0;
+      }
+      #fastestLapList li {
+        margin-bottom: 5px;
+      }
+      .position {
+        display: inline-block;
+        width: 20px;
+      }
+      input {
+        font-family: 'Courier New', Courier, monospace;
+        background-color: white;
+        color: red;
+        border: 1px solid red;
+        padding: 5px;
+        margin-right: 10px;
+        width: 100px;
+      }
+      button {
+        font-family: 'Courier New', Courier, monospace;
+        background-color: white;
+        color: red;
+        border: 1px solid red;
+        padding: 5px 10px;
+        cursor: pointer;
+      }
+      #errorMessage {
+        margin-top: 10px;
+      }
+      .confirm-dialog {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        border: 1px solid red;
+        padding: 20px;
+        display: none;
+      }
+      .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.8);
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -33,13 +97,12 @@
     <script type="module">
       // Import the functions you need from the SDKs you need
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-      import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+      import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
       // Your web app's Firebase configuration
       const firebaseConfig = {
         apiKey: "AIzaSyCe5Xpf_xUPpXTQ3V8dqokqHt89kkNiwX4",
         authDomain: "carrera-leaderboards.firebaseapp.com",
-        databaseURL: "https://carrera-leaderboards-default-rtdb.firebaseio.com",
         projectId: "carrera-leaderboards",
         storageBucket: "carrera-leaderboards.appspot.com",
         messagingSenderId: "1036912209370",
@@ -48,22 +111,25 @@
 
       // Initialize Firebase
       const app = initializeApp(firebaseConfig);
-      const database = getDatabase(app);
-      const lapTimesRef = ref(database, 'lapTimes');
+      const db = getFirestore(app);
+      const lapTimesCollection = collection(db, 'lapTimes');
 
       let itemToDelete = null;
 
       function loadLapTimes() {
-        onValue(lapTimesRef, (snapshot) => {
-          const lapTimes = snapshot.val() || {};
-          renderLapTimes(Object.values(lapTimes));
+        const q = query(lapTimesCollection, orderBy("time"));
+        onSnapshot(q, (snapshot) => {
+          const lapTimes = [];
+          snapshot.forEach((doc) => {
+            lapTimes.push({ id: doc.id, ...doc.data() });
+          });
+          renderLapTimes(lapTimes);
         });
       }
 
       function renderLapTimes(lapTimes) {
         const list = document.getElementById('fastestLapList');
         list.innerHTML = '';
-        lapTimes.sort((a, b) => convertToSeconds(a.time) - convertToSeconds(b.time));
         lapTimes.forEach((item, index) => {
           const li = document.createElement('li');
           li.innerHTML = `
@@ -75,7 +141,7 @@
         });
       }
 
-      function addLapTime() {
+      async function addLapTime() {
         const timeInput = document.getElementById('lapTimeInput');
         const nameInput = document.getElementById('racerNameInput');
         const carInput = document.getElementById('carNameInput');
@@ -88,16 +154,19 @@
 
         if (timeFormat.test(lapTime) && racerName && carName) {
           errorMessage.textContent = '';
-          const newLapTimeRef = push(lapTimesRef);
-          set(newLapTimeRef, {
-            id: newLapTimeRef.key,
-            time: lapTime,
-            racer: racerName,
-            car: carName
-          });
-          timeInput.value = '';
-          nameInput.value = '';
-          carInput.value = '';
+          try {
+            await addDoc(lapTimesCollection, {
+              time: lapTime,
+              racer: racerName,
+              car: carName
+            });
+            timeInput.value = '';
+            nameInput.value = '';
+            carInput.value = '';
+          } catch (e) {
+            console.error("Error adding document: ", e);
+            errorMessage.textContent = 'Error adding lap time. Please try again.';
+          }
         } else {
           errorMessage.textContent = 'INVALID INPUT. USE FORMAT: MM:SS, NAME, CAR';
         }
@@ -109,10 +178,14 @@
         document.getElementById('confirmDialog').style.display = 'block';
       }
 
-      function confirmDelete() {
+      async function confirmDelete() {
         if (itemToDelete) {
-          remove(ref(database, `lapTimes/${itemToDelete}`));
-          itemToDelete = null;
+          try {
+            await deleteDoc(doc(db, 'lapTimes', itemToDelete));
+            itemToDelete = null;
+          } catch (e) {
+            console.error("Error deleting document: ", e);
+          }
         }
         hideDeleteConfirmation();
       }
@@ -125,11 +198,6 @@
       function hideDeleteConfirmation() {
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('confirmDialog').style.display = 'none';
-      }
-
-      function convertToSeconds(timeString) {
-        const [minutes, seconds] = timeString.split(':').map(Number);
-        return minutes * 60 + seconds;
       }
 
       // Event listeners
