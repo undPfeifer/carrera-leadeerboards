@@ -20,19 +20,22 @@
         font-size: 16px;
         font-weight: normal;
       }
-      #fastestLapList {
+      .leaderboard-section {
+        margin-bottom: 30px;
+      }
+      .lap-list {
         list-style-type: none;
         padding: 0;
         margin: 20px 0;
       }
-      #fastestLapList li {
+      .lap-list li {
         margin-bottom: 5px;
       }
       .position {
         display: inline-block;
         width: 20px;
       }
-      input {
+      input, select {
         font-family: 'Courier New', Courier, monospace;
         background-color: white;
         color: red;
@@ -49,7 +52,7 @@
         padding: 5px 10px;
         cursor: pointer;
       }
-      #errorMessage {
+      .error-message {
         margin-top: 10px;
       }
       .confirm-dialog {
@@ -71,21 +74,39 @@
         background-color: rgba(255, 255, 255, 0.8);
         display: none;
       }
+      .input-group {
+        margin-bottom: 10px;
+      }
     </style>
   </head>
   <body>
-    <h1>FASTEST LAP</h1>
-    <h2>OVERALL</h2>
+    <div class="leaderboard-section">
+      <h1>FASTEST LAP</h1>
+      <h2>INSIDE</h2>
+      <ol id="fastestLapListInside" class="lap-list"></ol>
+    </div>
 
-    <ol id="fastestLapList"></ol>
+    <div class="leaderboard-section">
+      <h1>FASTEST LAP</h1>
+      <h2>OUTSIDE</h2>
+      <ol id="fastestLapListOutside" class="lap-list"></ol>
+    </div>
 
-    <div>
+    <div class="input-group">
+      <select id="lapCategory">
+        <option value="inside">INSIDE</option>
+        <option value="outside">OUTSIDE</option>
+      </select>
       <input type="text" id="lapTimeInput" placeholder="LAP TIME" />
       <input type="text" id="racerNameInput" placeholder="RACER NAME" />
-      <input type="text" id="carNameInput" placeholder="CAR NAME" />
-      <button id="addLapButton">ADD LAP</button>
+      <select id="carNameInput">
+        <option value="RED CAR">RED CAR</option>
+        <option value="GREEN CAR">GREEN CAR</option>
+        <option value="WHITE PORSCHE">WHITE PORSCHE</option>
+      </select>
+      <button onclick="addLapTime()">ADD LAP</button>
     </div>
-    <div id="errorMessage"></div>
+    <div id="errorMessage" class="error-message"></div>
 
     <div class="overlay" id="overlay"></div>
     <div class="confirm-dialog" id="confirmDialog">
@@ -112,49 +133,54 @@
       // Initialize Firebase
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
-      const lapTimesCollection = collection(db, 'lapTimes');
+      const lapTimesCollectionInside = collection(db, 'lapTimesInside');
+      const lapTimesCollectionOutside = collection(db, 'lapTimesOutside');
 
       let itemToDelete = null;
+      let currentCategory = null;
 
-      function loadLapTimes() {
+      function loadLapTimes(category) {
+        const lapTimesCollection = category === 'inside' ? lapTimesCollectionInside : lapTimesCollectionOutside;
         const q = query(lapTimesCollection, orderBy("time"));
         onSnapshot(q, (snapshot) => {
           const lapTimes = [];
           snapshot.forEach((doc) => {
             lapTimes.push({ id: doc.id, ...doc.data() });
           });
-          renderLapTimes(lapTimes);
+          renderLapTimes(lapTimes, category);
         });
       }
 
-      function renderLapTimes(lapTimes) {
-        const list = document.getElementById('fastestLapList');
+      function renderLapTimes(lapTimes, category) {
+        const list = document.getElementById(`fastestLapList${category.charAt(0).toUpperCase() + category.slice(1)}`);
         list.innerHTML = '';
         lapTimes.forEach((item, index) => {
           const li = document.createElement('li');
           li.innerHTML = `
             <span class="position">${index + 1} </span>
             <span class="time">${item.time}</span> ${item.racer} ${item.car}
-            <button onclick="showDeleteConfirmation('${item.id}')">X</button>
+            <button onclick="showDeleteConfirmation('${item.id}', '${category}')">X</button>
           `;
           list.appendChild(li);
         });
       }
 
-      async function addLapTime() {
+      window.addLapTime = async function() {
+        const category = document.getElementById('lapCategory').value;
         const timeInput = document.getElementById('lapTimeInput');
         const nameInput = document.getElementById('racerNameInput');
         const carInput = document.getElementById('carNameInput');
         const errorMessage = document.getElementById('errorMessage');
         const lapTime = timeInput.value.trim();
         const racerName = nameInput.value.trim().toUpperCase();
-        const carName = carInput.value.trim().toUpperCase();
+        const carName = carInput.value;
 
         const timeFormat = /^([0-5]?[0-9]):([0-9][0-9])$/;
 
-        if (timeFormat.test(lapTime) && racerName && carName) {
+        if (timeFormat.test(lapTime) && racerName) {
           errorMessage.textContent = '';
           try {
+            const lapTimesCollection = category === 'inside' ? lapTimesCollectionInside : lapTimesCollectionOutside;
             await addDoc(lapTimesCollection, {
               time: lapTime,
               racer: racerName,
@@ -162,18 +188,18 @@
             });
             timeInput.value = '';
             nameInput.value = '';
-            carInput.value = '';
           } catch (e) {
             console.error("Error adding document: ", e);
             errorMessage.textContent = 'Error adding lap time. Please try again.';
           }
         } else {
-          errorMessage.textContent = 'INVALID INPUT. USE FORMAT: MM:SS, NAME, CAR';
+          errorMessage.textContent = 'INVALID INPUT. USE FORMAT: MM:SS, NAME';
         }
       }
 
-      function showDeleteConfirmation(id) {
+      window.showDeleteConfirmation = function(id, category) {
         itemToDelete = id;
+        currentCategory = category;
         document.getElementById('overlay').style.display = 'block';
         document.getElementById('confirmDialog').style.display = 'block';
       }
@@ -181,8 +207,10 @@
       async function confirmDelete() {
         if (itemToDelete) {
           try {
-            await deleteDoc(doc(db, 'lapTimes', itemToDelete));
+            const lapTimesCollection = currentCategory === 'inside' ? lapTimesCollectionInside : lapTimesCollectionOutside;
+            await deleteDoc(doc(db, lapTimesCollection.path, itemToDelete));
             itemToDelete = null;
+            currentCategory = null;
           } catch (e) {
             console.error("Error deleting document: ", e);
           }
@@ -192,6 +220,7 @@
 
       function cancelDelete() {
         itemToDelete = null;
+        currentCategory = null;
         hideDeleteConfirmation();
       }
 
@@ -201,14 +230,15 @@
       }
 
       // Event listeners
-      document.getElementById('addLapButton').addEventListener('click', addLapTime);
       document.getElementById('confirmDeleteButton').addEventListener('click', confirmDelete);
       document.getElementById('cancelDeleteButton').addEventListener('click', cancelDelete);
 
       // Load lap times when the page loads
-      loadLapTimes();
+      loadLapTimes('inside');
+      loadLapTimes('outside');
 
-      // Make showDeleteConfirmation globally accessible
+      // Make functions globally accessible
+      window.addLapTime = addLapTime;
       window.showDeleteConfirmation = showDeleteConfirmation;
     </script>
   </body>
