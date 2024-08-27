@@ -6,71 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>Carrera Leaderboard</title>
     <style>
-      body {
-        font-family: 'Courier New', Courier, monospace;
-        background-color: white;
-        color: red;
-        padding: 20px;
-        line-height: 1.2;
-        font-size: 16px;
-      }
-      h1, h2 {
-        margin: 0;
-        padding: 0;
-        font-size: 16px;
-        font-weight: normal;
-      }
-      #fastestLapList {
-        list-style-type: none;
-        padding: 0;
-        margin: 20px 0;
-      }
-      #fastestLapList li {
-        margin-bottom: 5px;
-      }
-      .position {
-        display: inline-block;
-        width: 20px;
-      }
-      input {
-        font-family: 'Courier New', Courier, monospace;
-        background-color: white;
-        color: red;
-        border: 1px solid red;
-        padding: 5px;
-        margin-right: 10px;
-        width: 100px;
-      }
-      button {
-        font-family: 'Courier New', Courier, monospace;
-        background-color: white;
-        color: red;
-        border: 1px solid red;
-        padding: 5px 10px;
-        cursor: pointer;
-      }
-      #errorMessage {
-        margin-top: 10px;
-      }
-      .confirm-dialog {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: white;
-        border: 1px solid red;
-        padding: 20px;
-        display: none;
-      }
-      .overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(255, 255, 255, 0.8);
-        display: none;
-      }
+      /* Your existing CSS here */
     </style>
   </head>
   <body>
@@ -83,26 +19,27 @@
       <input type="text" id="lapTimeInput" placeholder="LAP TIME" />
       <input type="text" id="racerNameInput" placeholder="RACER NAME" />
       <input type="text" id="carNameInput" placeholder="CAR NAME" />
-      <button onclick="addLapTime()">ADD LAP</button>
+      <button id="addLapButton">ADD LAP</button>
     </div>
     <div id="errorMessage"></div>
 
     <div class="overlay" id="overlay"></div>
     <div class="confirm-dialog" id="confirmDialog">
       <p>DELETE THIS ENTRY?</p>
-      <button onclick="confirmDelete()">YES</button>
-      <button onclick="cancelDelete()">NO</button>
+      <button id="confirmDeleteButton">YES</button>
+      <button id="cancelDeleteButton">NO</button>
     </div>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+    <script type="module">
+      // Import the functions you need from the SDKs you need
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+      import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
 
-    <script>
       // Your web app's Firebase configuration
       const firebaseConfig = {
         apiKey: "AIzaSyCe5Xpf_xUPpXTQ3V8dqokqHt89kkNiwX4",
         authDomain: "carrera-leaderboards.firebaseapp.com",
+        databaseURL: "https://carrera-leaderboards-default-rtdb.firebaseio.com",
         projectId: "carrera-leaderboards",
         storageBucket: "carrera-leaderboards.appspot.com",
         messagingSenderId: "1036912209370",
@@ -110,14 +47,14 @@
       };
 
       // Initialize Firebase
-      firebase.initializeApp(firebaseConfig);
-      const database = firebase.database();
-      const lapTimesRef = database.ref('lapTimes');
+      const app = initializeApp(firebaseConfig);
+      const database = getDatabase(app);
+      const lapTimesRef = ref(database, 'lapTimes');
 
       let itemToDelete = null;
 
       function loadLapTimes() {
-        lapTimesRef.on('value', (snapshot) => {
+        onValue(lapTimesRef, (snapshot) => {
           const lapTimes = snapshot.val() || {};
           renderLapTimes(Object.values(lapTimes));
         });
@@ -151,8 +88,8 @@
 
         if (timeFormat.test(lapTime) && racerName && carName) {
           errorMessage.textContent = '';
-          const newLapTimeRef = lapTimesRef.push();
-          newLapTimeRef.set({
+          const newLapTimeRef = push(lapTimesRef);
+          set(newLapTimeRef, {
             id: newLapTimeRef.key,
             time: lapTime,
             racer: racerName,
@@ -174,7 +111,7 @@
 
       function confirmDelete() {
         if (itemToDelete) {
-          lapTimesRef.child(itemToDelete).remove();
+          remove(ref(database, `lapTimes/${itemToDelete}`));
           itemToDelete = null;
         }
         hideDeleteConfirmation();
@@ -195,47 +132,16 @@
         return minutes * 60 + seconds;
       }
 
+      // Event listeners
+      document.getElementById('addLapButton').addEventListener('click', addLapTime);
+      document.getElementById('confirmDeleteButton').addEventListener('click', confirmDelete);
+      document.getElementById('cancelDeleteButton').addEventListener('click', cancelDelete);
+
       // Load lap times when the page loads
       loadLapTimes();
 
-      // Add initial items if the list is empty
-      lapTimesRef.once('value', (snapshot) => {
-        if (!snapshot.exists()) {
-          const initialLapTimes = [
-            { time: '29:88', racer: 'DIMI', car: 'GREEN CAR' },
-            { time: '30:08', racer: 'DIMI', car: 'GREEN CAR' },
-            { time: '31:10', racer: 'DIMI', car: 'WHITE PORSCHE' }
-          ];
-          initialLapTimes.forEach((lapTime) => {
-            const newLapTimeRef = lapTimesRef.push();
-            newLapTimeRef.set({
-              id: newLapTimeRef.key,
-              ...lapTime
-            });
-          });
-        }
-      });
+      // Make showDeleteConfirmation globally accessible
+      window.showDeleteConfirmation = showDeleteConfirmation;
     </script>
   </body>
 </html>
-
-
-<script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyCe5Xpf_xUPpXTQ3V8dqokqHt89kkNiwX4",
-    authDomain: "carrera-leaderboards.firebaseapp.com",
-    projectId: "carrera-leaderboards",
-    storageBucket: "carrera-leaderboards.appspot.com",
-    messagingSenderId: "1036912209370",
-    appId: "1:1036912209370:web:cfd23ba8b95236e20ee4e3"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-</script>
