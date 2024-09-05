@@ -77,6 +77,9 @@
       .input-group {
         margin-bottom: 10px;
       }
+      #newRacerInput {
+        width: 150px;
+      }
     </style>
   </head>
   <body>
@@ -98,11 +101,7 @@
         <option value="outside">OUTSIDE</option>
       </select>
       <input type="text" id="lapTimeInput" placeholder="LAP TIME" />
-      <select id="racerNameInput">
-        <option value="THOMAS">THOMAS</option>
-        <option value="DIMI">DIMI</option>
-        <option value="JORAN">JORAN</option>
-      </select>
+      <select id="racerNameInput"></select>
       <select id="carNameInput">
         <option value="RED CAR">RED CAR</option>
         <option value="GREEN CAR">GREEN CAR</option>
@@ -133,6 +132,10 @@
       </select>
       <button onclick="addLapTime()">ADD LAP</button>
     </div>
+    <div class="input-group">
+      <input type="text" id="newRacerInput" placeholder="NEW RACER NAME" />
+      <button onclick="addNewRacer()">ADD RACER</button>
+    </div>
     <div id="errorMessage" class="error-message"></div>
 
     <div class="overlay" id="overlay"></div>
@@ -162,6 +165,7 @@
       const db = getFirestore(app);
       const lapTimesCollectionInside = collection(db, 'lapTimesInside');
       const lapTimesCollectionOutside = collection(db, 'lapTimesOutside');
+      const racersCollection = collection(db, 'racers');
 
       let itemToDelete = null;
       let currentCategory = null;
@@ -231,6 +235,36 @@
         }
       }
 
+      window.addNewRacer = async function() {
+        const newRacerInput = document.getElementById('newRacerInput');
+        const newRacerName = newRacerInput.value.trim().toUpperCase();
+        
+        if (newRacerName) {
+          try {
+            await addDoc(racersCollection, { name: newRacerName });
+            newRacerInput.value = '';
+            loadRacers();
+          } catch (e) {
+            console.error("Error adding new racer: ", e);
+            document.getElementById('errorMessage').textContent = 'Error adding new racer. Please try again.';
+          }
+        }
+      }
+
+      function loadRacers() {
+        const racerNameInput = document.getElementById('racerNameInput');
+        onSnapshot(racersCollection, (snapshot) => {
+          racerNameInput.innerHTML = '';
+          snapshot.forEach((doc) => {
+            const racer = doc.data();
+            const option = document.createElement('option');
+            option.value = racer.name;
+            option.textContent = racer.name;
+            racerNameInput.appendChild(option);
+          });
+        });
+      }
+
       window.showDeleteConfirmation = function(id, category) {
         itemToDelete = id;
         currentCategory = category;
@@ -267,13 +301,15 @@
       document.getElementById('confirmDeleteButton').addEventListener('click', confirmDelete);
       document.getElementById('cancelDeleteButton').addEventListener('click', cancelDelete);
 
-      // Load lap times when the page loads
+      // Load lap times and racers when the page loads
       loadLapTimes('inside');
       loadLapTimes('outside');
+      loadRacers();
 
       // Make functions globally accessible
       window.addLapTime = addLapTime;
       window.showDeleteConfirmation = showDeleteConfirmation;
+      window.addNewRacer = addNewRacer;
     </script>
   </body>
 </html>
