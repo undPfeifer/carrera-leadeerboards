@@ -108,6 +108,28 @@
         <option value="GREEN CAR">GREEN CAR</option>
         <option value="WHITE PORSCHE">WHITE PORSCHE</option>
       </select>
+      <select id="voltageInput">
+        <option value="12V">12V</option>
+        <option value="13V">13V</option>
+        <option value="14V">14V</option>
+        <option value="15V">15V</option>
+        <option value="16V">16V</option>
+        <option value="17V">17V</option>
+        <option value="18V">18V</option>
+        <option value="19V">19V</option>
+        <option value="20V">20V</option>
+        <option value="21V">21V</option>
+        <option value="22V">22V</option>
+        <option value="23V">23V</option>
+        <option value="24V">24V</option>
+        <option value="25V">25V</option>
+        <option value="26V">26V</option>
+        <option value="27V">27V</option>
+        <option value="28V">28V</option>
+        <option value="29V">29V</option>
+        <option value="30V">30V</option>
+        <option value="31V">31V</option>
+      </select>
       <button onclick="addLapTime()">ADD LAP</button>
     </div>
     <div id="errorMessage" class="error-message"></div>
@@ -162,7 +184,7 @@
           const li = document.createElement('li');
           li.innerHTML = `
             <span class="position">${index + 1} </span>
-            <span class="time">${item.time}</span> ${item.racer} ${item.car}
+            <span class="time">${item.time}</span> ${item.racer} ${item.car} ${item.voltage}
             <button onclick="showDeleteConfirmation('${item.id}', '${category}')">X</button>
           `;
           list.appendChild(li);
@@ -174,10 +196,12 @@
         const timeInput = document.getElementById('lapTimeInput');
         const nameInput = document.getElementById('racerNameInput');
         const carInput = document.getElementById('carNameInput');
+        const voltageInput = document.getElementById('voltageInput');
         const errorMessage = document.getElementById('errorMessage');
         const lapTime = timeInput.value.trim();
         const racerName = nameInput.value;
         const carName = carInput.value;
+        const voltage = voltageInput.value;
 
         const timeFormat = /^([0-5]?[0-9]):([0-9][0-9])$/;
 
@@ -188,7 +212,8 @@
             await addDoc(lapTimesCollection, {
               time: lapTime,
               racer: racerName,
-              car: carName
+              car: carName,
+              voltage: voltage
             });
             timeInput.value = '';
           } catch (e) {
